@@ -1,0 +1,1219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Minimal Focus Timer</title>
+  <style>
+    :root{
+      --bg:#0b0f1a;
+      --muted:#7f90ad;
+      --text:#e9f0ff;
+      --accent:#7aa2ff;
+      --accent2:#6ee7b7;
+      --danger:#ff6b6b;
+      --ringBg:rgba(255,255,255,0.10);
+      --shadow:0 18px 60px rgba(0,0,0,0.40);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background:
+        radial-gradient(1200px 800px at 30% 10%, rgba(122,162,255,0.20), transparent 50%),
+        radial-gradient(900px 600px at 80% 70%, rgba(110,231,183,0.14), transparent 50%),
+        var(--bg);
+      color:var(--text);
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+    }
+    .wrap{
+      width:min(1020px, 100%);
+      display:grid;
+      grid-template-columns: 1.2fr 0.9fr;
+      gap:18px;
+    }
+    @media (max-width: 920px){
+      .wrap{grid-template-columns:1fr}
+    }
+    .card{
+      position:relative;
+      background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:18px;
+      overflow:hidden;
+    }
+
+    /* Goal */
+    .goalTop{
+      display:grid;
+      gap:12px;
+      padding:14px 14px;
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,0.10);
+      background:
+        radial-gradient(500px 220px at 20% 10%, rgba(122,162,255,0.22), transparent 60%),
+        radial-gradient(500px 220px at 80% 90%, rgba(110,231,183,0.16), transparent 60%),
+        rgba(255,255,255,0.045);
+      margin-bottom:14px;
+    }
+    .goalHead{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+    .goalLeft{
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+    }
+    .goalIcon{
+      width:38px;
+      height:38px;
+      border-radius:14px;
+      display:grid;
+      place-items:center;
+      background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.10);
+      font-size:18px;
+      user-select:none;
+    }
+    .goalTitle{
+      font-weight:950;
+      font-size:12px;
+      letter-spacing:0.22px;
+      color:var(--muted);
+      margin-bottom:6px;
+    }
+    .goalBig{
+      font-weight:980;
+      font-size:32px;
+      letter-spacing:0.3px;
+      line-height:1.05;
+    }
+    .goalSmall{
+      color:var(--muted);
+      font-size:13px;
+      font-weight:850;
+      align-self:center;
+      padding:8px 10px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.10);
+      background:rgba(255,255,255,0.05);
+    }
+    .goalBar{
+      width:100%;
+      height:11px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.11);
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,0.08);
+    }
+    .goalFill{
+      height:100%;
+      width:0%;
+      background: linear-gradient(90deg, rgba(122,162,255,0.95), rgba(110,231,183,0.90));
+      border-radius:999px;
+    }
+
+    .top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:14px;
+    }
+    .pill{
+      display:flex;
+      gap:8px;
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.08);
+      padding:6px;
+      border-radius:999px;
+    }
+    .pill button{
+      appearance:none;
+      border:0;
+      background:transparent;
+      color:var(--muted);
+      padding:8px 12px;
+      border-radius:999px;
+      cursor:pointer;
+      font-weight:900;
+      letter-spacing:0.2px;
+    }
+    .pill button.active{
+      background:rgba(122,162,255,0.18);
+      color:var(--text);
+      border:1px solid rgba(122,162,255,0.35);
+    }
+    .hint{
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.25;
+      text-align:right;
+      white-space:nowrap;
+    }
+    .kbd{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:11px;
+      padding:2px 6px;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.06);
+      color:var(--text);
+    }
+
+    .timerArea{
+      display:grid;
+      place-items:center;
+      padding:6px 0 6px;
+    }
+    .ring{
+      width:320px;
+      height:320px;
+      position:relative;
+      display:grid;
+      place-items:center;
+    }
+    .time{
+      font-size:60px;
+      font-weight:980;
+      letter-spacing:1px;
+    }
+    .sub{
+      margin-top:6px;
+      color:var(--muted);
+      font-size:14px;
+      font-weight:900;
+    }
+
+    .sessionsRow{
+      margin-top:10px;
+      display:flex;
+      justify-content:center;
+    }
+    .stat{
+      padding:8px 10px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.08);
+      background:rgba(255,255,255,0.04);
+      color:var(--text);
+      font-size:13px;
+      font-weight:950;
+    }
+    .stat span{
+      color:var(--muted);
+      font-weight:950;
+    }
+    .badgeOk{
+      border-color: rgba(110,231,183,0.35);
+      background: rgba(110,231,183,0.12);
+    }
+    .badgeWarn{
+      border-color: rgba(122,162,255,0.35);
+      background: rgba(122,162,255,0.12);
+    }
+
+    .controls{
+      display:flex;
+      gap:10px;
+      justify-content:center;
+      margin-top:14px;
+      flex-wrap:wrap;
+    }
+    .btn{
+      appearance:none;
+      border:1px solid rgba(255,255,255,0.10);
+      background:rgba(255,255,255,0.06);
+      color:var(--text);
+      padding:10px 14px;
+      border-radius:14px;
+      cursor:pointer;
+      font-weight:950;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      transition:transform 120ms ease, background 120ms ease, border 120ms ease;
+      user-select:none;
+    }
+    .btn:hover{transform:translateY(-1px); background:rgba(255,255,255,0.08)}
+    .btn.primary{
+      background:rgba(122,162,255,0.18);
+      border:1px solid rgba(122,162,255,0.35);
+    }
+    .btn.danger{
+      background:rgba(255,107,107,0.13);
+      border:1px solid rgba(255,107,107,0.35);
+    }
+
+    .row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin:10px 0;
+      padding:10px 12px;
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.06);
+      border-radius:14px;
+    }
+    label{
+      font-weight:950;
+      font-size:13px;
+    }
+    .small{
+      color:var(--muted);
+      font-size:12px;
+      margin-top:4px;
+      line-height:1.2;
+      font-weight:750;
+    }
+    input[type="number"]{
+      width:120px;
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,0.10);
+      background:rgba(0,0,0,0.2);
+      color:var(--text);
+      font-weight:950;
+      outline:none;
+    }
+    input[type="checkbox"]{
+      width:18px;
+      height:18px;
+      accent-color: var(--accent);
+    }
+    .footer{
+      color:var(--muted);
+      font-size:12px;
+      margin-top:10px;
+      line-height:1.45;
+    }
+    .miniGrid{
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap:10px;
+      align-items:center;
+      width:100%;
+    }
+    .twoInputs{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:flex-end;
+      flex-wrap:wrap;
+    }
+
+    /* Draggable image */
+    .floatingImgWrap{
+      position:absolute;
+      left:18px;
+      top:170px; /* will be overridden by saved position */
+      width:120px;
+      height:auto;
+      cursor:grab;
+      user-select:none;
+      touch-action:none;
+      z-index:5;
+      filter: drop-shadow(0 18px 30px rgba(0,0,0,0.45));
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      opacity: 1;
+    }
+    .floatingImgWrap:active{ cursor:grabbing; }
+    .floatingImg{
+      width:100%;
+      height:auto;
+      display:block;
+      border-radius:16px;
+      border: none;
+      background: transparent;
+    }
+    .imgHint{
+      position:absolute;
+      left:10px;
+      bottom:10px;
+      z-index:6;
+      font-size:11px;
+      color:rgba(233,240,255,0.8);
+      background:rgba(0,0,0,0.25);
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:12px;
+      padding:6px 8px;
+      backdrop-filter: blur(6px);
+      user-select:none;
+      pointer-events:none;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- TIMER -->
+    <section class="card" id="timerCard">
+
+      <!-- Draggable image (from images/) -->
+      <div id="floatingImgWrap" class="floatingImgWrap" style="display:none;">
+        <img id="floatingImg" class="floatingImg" alt="Draggable image" />
+      </div>
+      <div class="imgHint">Drag image · Wheel zoom · Double-click reset</div>
+
+      <!-- BIG DAILY GOAL ON TOP -->
+      <div class="goalTop" aria-label="Daily goal">
+        <div class="goalHead">
+          <div class="goalLeft">
+            <div class="goalIcon">🎯</div>
+            <div>
+              <div class="goalTitle">DAILY GOAL</div>
+              <div id="goalBig" class="goalBig">0:00 / 8:00</div>
+            </div>
+          </div>
+          <div id="goalSmall" class="goalSmall">0% complete</div>
+        </div>
+        <div class="goalBar" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+          <div id="goalFill" class="goalFill"></div>
+        </div>
+      </div>
+
+      <div class="top">
+        <div class="pill">
+          <button id="modeWork" class="active" type="button">Work</button>
+          <button id="modeBreak" type="button">Break</button>
+        </div>
+        <div class="hint">
+          <div><span class="kbd">Space</span> start/pause</div>
+          <div><span class="kbd">R</span> reset</div>
+          <div><span class="kbd">S</span> settings</div>
+        </div>
+      </div>
+
+      <div class="timerArea">
+        <div class="ring" aria-label="Progress">
+          <svg width="320" height="320" viewBox="0 0 320 320" role="img">
+            <defs>
+              <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="2" result="blur"/>
+                <feMerge>
+                  <feMergeNode in="blur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+            <circle cx="160" cy="160" r="125" stroke="var(--ringBg)" stroke-width="16" fill="none"/>
+            <circle id="ringFg" cx="160" cy="160" r="125"
+              stroke="var(--accent)" stroke-width="16" fill="none"
+              stroke-linecap="round"
+              transform="rotate(-90 160 160)"
+              filter="url(#softGlow)"
+            />
+          </svg>
+
+          <div style="position:absolute; text-align:center;">
+            <div id="time" class="time">25:00</div>
+            <div id="subtitle" class="sub">Work</div>
+
+            <div class="sessionsRow">
+              <div id="sessionsBadge" class="stat badgeWarn">
+                <span>Sessions</span> <b id="sessionsText">0 / 4</b>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="startPause" class="btn primary" type="button">▶ Start</button>
+          <button id="reset" class="btn" type="button">↺ Reset</button>
+          <button id="toggleSettings" class="btn" type="button">⚙ Settings</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="settingsCard" class="card" style="display:block;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <h2 style="margin:0; font-size:16px;">Settings</h2>
+        <button id="closeSettings" class="btn" type="button">✕</button>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="workMin">Work (minutes)</label>
+          <div class="small">Press <b>Enter</b> in settings to apply + reload timer.</div>
+        </div>
+        <input id="workMin" type="number" min="1" max="180" step="1" />
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="breakMin">Break (minutes)</label>
+          <div class="small">Press <b>Enter</b> to apply + reload.</div>
+        </div>
+        <input id="breakMin" type="number" min="1" max="60" step="1" />
+      </div>
+
+      <div class="row">
+        <div class="miniGrid">
+          <div>
+            <label>Session target</label>
+            <div class="small">+1 when a Work timer completes. Default 4.</div>
+          </div>
+          <div class="twoInputs">
+            <label style="display:flex; gap:8px; align-items:center; font-weight:950;">
+              <input id="sessionsForever" type="checkbox" />
+              Forever
+            </label>
+            <input id="sessionsTarget" type="number" min="1" max="999" step="1" />
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="miniGrid">
+          <div>
+            <label>Daily goal (hours)</label>
+            <div class="small">Counts total hours studied (Work time while running). Default 8.</div>
+          </div>
+          <div class="twoInputs">
+            <input id="dailyGoalHours" type="number" min="1" max="24" step="0.5" />
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="autoSwitch">Auto-switch mode</label>
+          <div class="small">At 0, automatically swap Work ⇄ Break.</div>
+        </div>
+        <input id="autoSwitch" type="checkbox" />
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="soundOn">Sound at end</label>
+          <div class="small">Default beep always works, optional audios/ files too.</div>
+        </div>
+        <input id="soundOn" type="checkbox" />
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Reset counters</label>
+          <div class="small">Reset sessions + today hours (settings stay).</div>
+        </div>
+        <button id="resetCounters" class="btn" type="button">Reset counters</button>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Restore defaults</label>
+          <div class="small">Restores settings and clears saved data.</div>
+        </div>
+        <button id="restoreDefaults" class="btn danger" type="button">Restore defaults</button>
+      </div>
+
+      <div class="footer">
+        Tip: In Settings, press <b>Enter</b> to apply changes and reload the clock immediately.
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // ---------- Storage ----------
+    const STORAGE_KEY = "minimal_focus_timer_v4";
+    const DEFAULTS = {
+      workMin: 45,
+      breakMin: 5,
+      autoSwitch: true,
+      soundOn: true,
+      mode: "work",
+
+      sessionsForever: false,
+      sessionsTarget: 4,
+      dailyGoalHours: 8,
+
+      todayKey: "",
+      todayFocusSeconds: 0,
+      sessionsDoneToday: 0,
+
+      // Draggable image state
+      imgX: 18,
+      imgY: 170,
+      imgScale: 1.0,
+
+      // Audio: remember last picked index for consistency
+      lastAudioPick: -1
+    };
+
+    function todayISO(){
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,"0");
+      const day = String(d.getDate()).padStart(2,"0");
+      return `${y}-${m}-${day}`;
+    }
+
+    function loadAll(){
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const base = { ...DEFAULTS, todayKey: todayISO() };
+        if(!raw) return base;
+        const obj = JSON.parse(raw);
+        const merged = { ...base, ...obj };
+        if(!merged.todayKey) merged.todayKey = todayISO();
+        return merged;
+      }catch{
+        return { ...DEFAULTS, todayKey: todayISO() };
+      }
+    }
+
+    let settings = loadAll();
+
+    function saveAll(){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    }
+
+    function rolloverIfNewDay(){
+      const t = todayISO();
+      if(settings.todayKey !== t){
+        settings.todayKey = t;
+        settings.todayFocusSeconds = 0;
+        settings.sessionsDoneToday = 0;
+        saveAll();
+      }
+    }
+
+    // ---------- Elements ----------
+    const timerCard = document.getElementById("timerCard");
+
+    const elTime = document.getElementById("time");
+    const elSubtitle = document.getElementById("subtitle");
+
+    const btnStartPause = document.getElementById("startPause");
+    const btnReset = document.getElementById("reset");
+
+    const btnToggleSettings = document.getElementById("toggleSettings");
+    const settingsCard = document.getElementById("settingsCard");
+    const btnCloseSettings = document.getElementById("closeSettings");
+
+    const btnModeWork = document.getElementById("modeWork");
+    const btnModeBreak = document.getElementById("modeBreak");
+
+    const inpWork = document.getElementById("workMin");
+    const inpBreak = document.getElementById("breakMin");
+    const inpAuto = document.getElementById("autoSwitch");
+    const inpSound = document.getElementById("soundOn");
+
+    const inpSessionsForever = document.getElementById("sessionsForever");
+    const inpSessionsTarget = document.getElementById("sessionsTarget");
+    const inpDailyGoalHours = document.getElementById("dailyGoalHours");
+
+    const btnResetCounters = document.getElementById("resetCounters");
+    const btnRestoreDefaults = document.getElementById("restoreDefaults");
+
+    const ringFg = document.getElementById("ringFg");
+
+    const sessionsText = document.getElementById("sessionsText");
+    const sessionsBadge = document.getElementById("sessionsBadge");
+
+    // Big goal UI
+    const goalBig = document.getElementById("goalBig");
+    const goalSmall = document.getElementById("goalSmall");
+    const goalFill = document.getElementById("goalFill");
+
+    // Draggable image
+    const floatingImgWrap = document.getElementById("floatingImgWrap");
+    const floatingImg = document.getElementById("floatingImg");
+
+    // ---------- Timer State ----------
+    rolloverIfNewDay();
+
+    let mode = settings.mode;            // "work" | "break"
+    let isRunning = false;
+    let intervalId = null;
+
+    let totalSeconds = 0;
+    let remainingSeconds = 0;
+
+    // Ring geometry
+    const R = 125;
+    const C = 2 * Math.PI * R;
+    ringFg.style.strokeDasharray = `${C} ${C}`;
+    ringFg.style.strokeDashoffset = `${0}`;
+
+    // ---------- Helpers ----------
+    function clampInt(n, min, max){
+      const x = Number.parseInt(n, 10);
+      if(Number.isNaN(x)) return min;
+      return Math.min(max, Math.max(min, x));
+    }
+    function clampFloat(n, min, max){
+      const x = Number.parseFloat(n);
+      if(Number.isNaN(x)) return min;
+      return Math.min(max, Math.max(min, x));
+    }
+
+    function formatTime(sec){
+      const s = Math.max(0, sec);
+      const mm = Math.floor(s / 60);
+      const ss = s % 60;
+      return String(mm).padStart(2,"0") + ":" + String(ss).padStart(2,"0");
+    }
+    function formatHMFromSeconds(sec){
+      const s = Math.max(0, sec);
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      return `${h}:${String(m).padStart(2,"0")}`;
+    }
+    function formatGoalHM(hours){
+      const totalMin = Math.round(hours * 60);
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      return `${h}:${String(m).padStart(2,"0")}`;
+    }
+
+    function modeDurationSeconds(m){
+      return (m === "work" ? settings.workMin : settings.breakMin) * 60;
+    }
+
+    function render(){
+      elTime.textContent = formatTime(remainingSeconds);
+      const progress = totalSeconds === 0 ? 0 : (remainingSeconds / totalSeconds);
+      ringFg.style.strokeDashoffset = `${C * (1 - progress)}`;
+    }
+
+    function renderGoal(){
+      const goalSec = Math.round(settings.dailyGoalHours * 3600);
+      const done = settings.todayFocusSeconds;
+      const pct = goalSec <= 0 ? 0 : Math.min(100, Math.round((done / goalSec) * 100));
+
+      goalBig.textContent = `${formatHMFromSeconds(done)} / ${formatGoalHM(settings.dailyGoalHours)}`;
+      goalSmall.textContent = pct >= 100 ? "✅ Goal reached" : `${pct}% complete`;
+      goalFill.style.width = `${pct}%`;
+    }
+
+    function renderSessions(){
+      const targetStr = settings.sessionsForever ? "∞" : String(settings.sessionsTarget);
+      sessionsText.textContent = `${settings.sessionsDoneToday} / ${targetStr}`;
+
+      const sessionsDone = settings.sessionsDoneToday;
+      const sessionsTarget = settings.sessionsForever ? Infinity : settings.sessionsTarget;
+
+      sessionsBadge.classList.remove("badgeOk","badgeWarn");
+      sessionsBadge.classList.add(sessionsDone >= sessionsTarget ? "badgeOk" : "badgeWarn");
+    }
+
+    function setDocumentTitle(){
+      const label = mode === "work" ? "Work" : "Break";
+      document.title = `${formatTime(remainingSeconds)} • ${label}`;
+    }
+
+    function stopInterval(){
+      if(intervalId !== null){
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    }
+
+    // ---------- Sound ----------
+    // Default beep always works.
+    function defaultBeep(){
+      try{
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = "sine";
+        o.frequency.value = 880;
+        g.gain.value = 0.0001;
+        o.connect(g);
+        g.connect(ctx.destination);
+
+        o.start();
+        const now = ctx.currentTime;
+        g.gain.exponentialRampToValueAtTime(0.15, now + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+        o.stop(now + 0.2);
+        o.onended = () => ctx.close();
+      }catch{}
+    }
+
+    const audioEl = new Audio();
+    audioEl.preload = "auto";
+
+    async function tryLoadAudioListFromManifest(){
+      // NOTE: fetch('audios/manifest.json') may fail on file:// URLs.
+      try{
+        const res = await fetch("audios/manifest.json", { cache: "no-store" });
+        if(!res.ok) return null;
+        const list = await res.json();
+        if(!Array.isArray(list)) return null;
+        // normalize into paths
+        const cleaned = list
+          .filter(x => typeof x === "string" && x.trim().length > 0)
+          .map(x => x.trim())
+          .map(x => x.startsWith("audios/") ? x : ("audios/" + x));
+        return cleaned.length ? cleaned : null;
+      }catch{
+        return null;
+      }
+    }
+
+    function fallbackAudioCandidates(){
+      // if you don't want this, remove names and rely on manifest
+      const names = [
+        "audios/konata---good-job!-made-with-Voicemod.mp3","audios/nii,-omega-good-job-made-with-Voicemod.mp3","audios/3.mp3"
+      ];
+      return names;
+    }
+
+    async function pickRandomPlayableAudio(){
+      const manifestList = await tryLoadAudioListFromManifest();
+      const list = manifestList ?? fallbackAudioCandidates();
+
+      // Pick random (avoid repeating last pick if possible)
+      let idx = Math.floor(Math.random() * list.length);
+      if(list.length > 1 && idx === settings.lastAudioPick){
+        idx = (idx + 1) % list.length;
+      }
+      settings.lastAudioPick = idx;
+      saveAll();
+
+      const src = list[idx];
+
+      // Try to load quickly
+      return new Promise((resolve) => {
+        let settled = false;
+
+        const cleanup = () => {
+          audioEl.oncanplaythrough = null;
+          audioEl.onerror = null;
+        };
+
+        audioEl.oncanplaythrough = () => {
+          if(settled) return;
+          settled = true;
+          cleanup();
+          resolve(src);
+        };
+
+        audioEl.onerror = () => {
+          if(settled) return;
+          settled = true;
+          cleanup();
+          resolve(null);
+        };
+
+        // kick load
+        audioEl.src = src;
+        audioEl.load();
+
+        // timeout fallback
+        setTimeout(() => {
+          if(settled) return;
+          settled = true;
+          cleanup();
+          resolve(null);
+        }, 900);
+      });
+    }
+
+    async function playEndSound(){
+      if(!settings.soundOn) return;
+
+      const src = await pickRandomPlayableAudio();
+      if(!src){
+        defaultBeep();
+        return;
+      }
+
+      try{
+        audioEl.currentTime = 0;
+        await audioEl.play();
+      }catch{
+        // If autoplay blocked (first interaction usually allows), fallback beep
+        defaultBeep();
+      }
+    }
+
+    // ---------- Session limiting ----------
+    function sessionLimitReached(){
+      if(settings.sessionsForever) return false;
+      return settings.sessionsDoneToday >= settings.sessionsTarget;
+    }
+
+    // ---------- Timer ----------
+    function setMode(newMode){
+      rolloverIfNewDay();
+      mode = newMode;
+      settings.mode = mode;
+      saveAll();
+
+      btnModeWork.classList.toggle("active", mode === "work");
+      btnModeBreak.classList.toggle("active", mode === "break");
+
+      elSubtitle.textContent = mode === "work" ? "Work" : "Break";
+      ringFg.style.stroke = (mode === "work") ? "var(--accent)" : "var(--accent2)";
+
+      totalSeconds = modeDurationSeconds(mode);
+      remainingSeconds = totalSeconds;
+
+      render();
+      renderGoal();
+      renderSessions();
+      setDocumentTitle();
+    }
+
+    function tick(){
+      rolloverIfNewDay();
+      if(!isRunning) return;
+
+      if(mode === "work"){
+        settings.todayFocusSeconds += 1;
+      }
+
+      remainingSeconds -= 1;
+      saveAll();
+
+      if(remainingSeconds <= 0){
+        remainingSeconds = 0;
+        render();
+        renderGoal();
+        renderSessions();
+        setDocumentTitle();
+
+        const completedMode = mode;
+
+        stop();
+
+        // sound (random audio if possible, otherwise default beep)
+        playEndSound();
+
+        if(completedMode === "work"){
+          settings.sessionsDoneToday += 1;
+          saveAll();
+          renderSessions();
+        }
+
+        // If reached session target, stop here (no auto-break)
+        if(completedMode === "work" && sessionLimitReached()){
+          return;
+        }
+
+        if(settings.autoSwitch){
+          const next = (completedMode === "work") ? "break" : "work";
+          setMode(next);
+          start();
+        }
+        return;
+      }
+
+      render();
+      renderGoal();
+      renderSessions();
+      setDocumentTitle();
+    }
+
+    function start(){
+      rolloverIfNewDay();
+
+      if(mode === "work" && sessionLimitReached()){
+        // small feedback
+        if(settings.soundOn) defaultBeep();
+        renderSessions();
+        return;
+      }
+
+      if(isRunning) return;
+      isRunning = true;
+      btnStartPause.textContent = "⏸ Pause";
+      stopInterval();
+      intervalId = setInterval(tick, 1000);
+    }
+
+    function stop(){
+      isRunning = false;
+      btnStartPause.textContent = "▶ Start";
+      stopInterval();
+    }
+
+    function toggleStartPause(){
+      if(isRunning) stop();
+      else start();
+    }
+
+    function reset(){
+      stop();
+      totalSeconds = modeDurationSeconds(mode);
+      remainingSeconds = totalSeconds;
+      render();
+      renderGoal();
+      renderSessions();
+      setDocumentTitle();
+    }
+
+    // ---------- Settings ----------
+    function showSettings(show){
+      settingsCard.style.display = show ? "block" : "none";
+    }
+
+    function syncSettingsUI(){
+      inpWork.value = settings.workMin;
+      inpBreak.value = settings.breakMin;
+      inpAuto.checked = !!settings.autoSwitch;
+      inpSound.checked = !!settings.soundOn;
+
+      inpSessionsForever.checked = !!settings.sessionsForever;
+      inpSessionsTarget.value = settings.sessionsTarget;
+      inpSessionsTarget.disabled = !!settings.sessionsForever;
+
+      inpDailyGoalHours.value = settings.dailyGoalHours;
+    }
+
+    function applySettingsFromUI(){
+      settings.workMin = clampInt(inpWork.value, 1, 180);
+      settings.breakMin = clampInt(inpBreak.value, 1, 60);
+
+      settings.sessionsForever = !!inpSessionsForever.checked;
+      settings.sessionsTarget = clampInt(inpSessionsTarget.value, 1, 999);
+
+      settings.dailyGoalHours = clampFloat(inpDailyGoalHours.value, 1, 24);
+
+      settings.autoSwitch = !!inpAuto.checked;
+      settings.soundOn = !!inpSound.checked;
+
+      // reflect disabled state immediately
+      inpSessionsTarget.disabled = settings.sessionsForever;
+
+      saveAll();
+      renderGoal();
+      renderSessions();
+    }
+
+    function applySettingsAndReloadTimer(){
+      // This is what you wanted:
+      // when pressing Enter in settings, it applies and "reloads" the clock immediately.
+      const wasRunning = isRunning;
+      stop();
+      applySettingsFromUI();
+      totalSeconds = modeDurationSeconds(mode);
+      remainingSeconds = totalSeconds;
+      render();
+      setDocumentTitle();
+      if(wasRunning) start();
+    }
+
+    // Press Enter anywhere inside settings to apply + reload
+    settingsCard.addEventListener("keydown", (e) => {
+      if(e.key === "Enter"){
+        e.preventDefault();
+        applySettingsAndReloadTimer();
+      }
+    });
+
+    // ---------- Draggable image ----------
+    function setImgTransform(){
+      floatingImgWrap.style.transform = `translate(${settings.imgX}px, ${settings.imgY}px) scale(${settings.imgScale})`;
+    }
+
+    function clampImageIntoCard(){
+      // keep it roughly inside card
+      const cardRect = timerCard.getBoundingClientRect();
+      const w = 120 * settings.imgScale;
+      const h = (floatingImg.naturalHeight && floatingImg.naturalWidth)
+        ? (120 * settings.imgScale * (floatingImg.naturalHeight / floatingImg.naturalWidth))
+        : (120 * settings.imgScale);
+
+      // limits in card coordinate space (relative)
+      const minX = -10;
+      const minY = -10;
+      const maxX = Math.max(minX, cardRect.width - w + 10);
+      const maxY = Math.max(minY, cardRect.height - h + 10);
+
+      settings.imgX = Math.min(maxX, Math.max(minX, settings.imgX));
+      settings.imgY = Math.min(maxY, Math.max(minY, settings.imgY));
+    }
+
+    function enableDrag(){
+      let dragging = false;
+      let startX = 0, startY = 0;
+      let baseX = 0, baseY = 0;
+
+      floatingImgWrap.addEventListener("pointerdown", (e) => {
+        dragging = true;
+        floatingImgWrap.setPointerCapture(e.pointerId);
+        startX = e.clientX;
+        startY = e.clientY;
+        baseX = settings.imgX;
+        baseY = settings.imgY;
+      });
+
+      floatingImgWrap.addEventListener("pointermove", (e) => {
+        if(!dragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        settings.imgX = baseX + dx;
+        settings.imgY = baseY + dy;
+        clampImageIntoCard();
+        setImgTransform();
+      });
+
+      floatingImgWrap.addEventListener("pointerup", () => {
+        if(!dragging) return;
+        dragging = false;
+        saveAll();
+      });
+
+      // wheel zoom
+      floatingImgWrap.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const delta = Math.sign(e.deltaY);
+        const step = 0.07;
+        settings.imgScale = Math.min(2.5, Math.max(0.45, settings.imgScale + (delta > 0 ? -step : step)));
+        clampImageIntoCard();
+        setImgTransform();
+        saveAll();
+      }, { passive:false });
+
+      // double click reset
+      floatingImgWrap.addEventListener("dblclick", () => {
+        settings.imgX = 18;
+        settings.imgY = 170;
+        settings.imgScale = 1.0;
+        setImgTransform();
+        saveAll();
+      });
+
+      // if window resizes
+      window.addEventListener("resize", () => {
+        clampImageIntoCard();
+        setImgTransform();
+      });
+    }
+
+    async function tryLoadFirstExistingImage(){
+      // We can't list a folder, so try common names.
+      const candidates = [
+        "images/1.png", "images/2.png"
+      ];
+
+      function canLoad(url){
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve(true);
+          img.onerror = () => resolve(false);
+          img.src = url + "?v=" + Date.now(); // bust cache during dev
+        });
+      }
+
+      for(const url of candidates){
+        const ok = await canLoad(url);
+        if(ok) return url;
+      }
+      return null;
+    }
+
+    async function initImage(){
+      const url = await tryLoadFirstExistingImage();
+      if(!url){
+        // no image found; hide wrapper
+        floatingImgWrap.style.display = "none";
+        return;
+      }
+      floatingImg.src = url;
+      floatingImgWrap.style.display = "block";
+      setImgTransform();
+      enableDrag();
+      floatingImg.onload = () => {
+        clampImageIntoCard();
+        setImgTransform();
+      };
+    }
+
+    // ---------- Init ----------
+    function init(){
+      syncSettingsUI();
+      setMode(mode);
+      renderGoal();
+      renderSessions();
+      showSettings(true);
+      initImage();
+    }
+
+    // ---------- Events ----------
+    btnStartPause.addEventListener("click", toggleStartPause);
+    btnReset.addEventListener("click", reset);
+
+    btnModeWork.addEventListener("click", () => { stop(); setMode("work"); });
+    btnModeBreak.addEventListener("click", () => { stop(); setMode("break"); });
+
+    btnToggleSettings.addEventListener("click", () => showSettings(settingsCard.style.display === "none"));
+    btnCloseSettings.addEventListener("click", () => showSettings(false));
+
+    // Normal changes just save (Enter does the "reload")
+    inpWork.addEventListener("change", applySettingsFromUI);
+    inpBreak.addEventListener("change", applySettingsFromUI);
+    inpAuto.addEventListener("change", applySettingsFromUI);
+    inpSound.addEventListener("change", applySettingsFromUI);
+    inpSessionsForever.addEventListener("change", applySettingsFromUI);
+    inpSessionsTarget.addEventListener("change", applySettingsFromUI);
+    inpDailyGoalHours.addEventListener("change", applySettingsFromUI);
+
+    btnResetCounters.addEventListener("click", () => {
+      rolloverIfNewDay();
+      settings.todayFocusSeconds = 0;
+      settings.sessionsDoneToday = 0;
+      saveAll();
+      renderGoal();
+      renderSessions();
+    });
+
+    btnRestoreDefaults.addEventListener("click", () => {
+      stop();
+      settings = { ...DEFAULTS, todayKey: todayISO() };
+      saveAll();
+      syncSettingsUI();
+      setMode(settings.mode);
+      renderGoal();
+      renderSessions();
+      showSettings(true);
+      initImage();
+    });
+
+    // Keyboard shortcuts (ignore if typing in an input)
+    window.addEventListener("keydown", (e) => {
+      const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
+      const typing = tag === "input" || tag === "textarea";
+      if(typing) return;
+
+      if(e.code === "Space"){
+        e.preventDefault();
+        toggleStartPause();
+      }else if(e.key.toLowerCase() === "r"){
+        reset();
+      }else if(e.key.toLowerCase() === "s"){
+        showSettings(settingsCard.style.display === "none");
+      }
+    });
+
+    // rollover if tab stays open across midnight
+    setInterval(() => {
+      const before = settings.todayKey;
+      rolloverIfNewDay();
+      if(settings.todayKey !== before){
+        renderGoal();
+        renderSessions();
+      }
+    }, 30_000);
+
+    init();
+  </script>
+</body>
+</html>
