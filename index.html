@@ -499,9 +499,31 @@
       <div class="row">
         <div>
           <label for="soundOn">Sound at end</label>
-          <div class="small">Default beep always works, optional audios/ files too.</div>
+          <div class="small">Plays a random audio when possible, and then always plays the default beep.</div>
         </div>
         <input id="soundOn" type="checkbox" />
+      </div>
+
+      <!-- ✅ NEW: Notifications -->
+      <div class="row">
+        <div>
+          <label for="notificationsOn">Notifications</label>
+          <div class="small">Show a desktop notification when a timer ends (needs permission).</div>
+        </div>
+        <input id="notificationsOn" type="checkbox" />
+      </div>
+
+      <!-- ✅ NEW: Audio chance -->
+      <div class="row">
+        <div class="miniGrid">
+          <div>
+            <label>Custom audio chance</label>
+            <div class="small">0 = beep only, 1 = always try a random audio first.</div>
+          </div>
+          <div class="twoInputs">
+            <input id="audioPickChance" type="number" min="0" max="1" step="0.05" />
+          </div>
+        </div>
       </div>
 
       <div class="row">
@@ -522,16 +544,17 @@
 
       <div class="footer">
         Tip: In Settings, press <b>Enter</b> to apply changes and reload the clock immediately.
+        <br/>Note: Notifications usually require running on <b>https://</b> or <b>http://localhost</b>, not <b>file://</b>.
       </div>
     </section>
   </div>
 
   <script>
     // ---------- Storage ----------
-    const STORAGE_KEY = "minimal_focus_timer_v4";
+    const STORAGE_KEY = "minimal_focus_timer_v5";
     const DEFAULTS = {
-      workMin: 45,
-      breakMin: 5,
+      workMin: 50,
+      breakMin: 10,
       autoSwitch: true,
       soundOn: true,
       mode: "work",
@@ -550,7 +573,11 @@
       imgScale: 1.0,
 
       // Audio: remember last picked index for consistency
-      lastAudioPick: -1
+      lastAudioPick: -1,
+
+      // ✅ NEW
+      notificationsOn: true,   // show system notifications at end
+      audioPickChance: 1.0     // 0..1 chance to use custom audio first
     };
 
     function todayISO(){
@@ -615,6 +642,10 @@
     const inpSessionsForever = document.getElementById("sessionsForever");
     const inpSessionsTarget = document.getElementById("sessionsTarget");
     const inpDailyGoalHours = document.getElementById("dailyGoalHours");
+
+    // ✅ NEW
+    const inpNotificationsOn = document.getElementById("notificationsOn");
+    const inpAudioPickChance = document.getElementById("audioPickChance");
 
     const btnResetCounters = document.getElementById("resetCounters");
     const btnRestoreDefaults = document.getElementById("restoreDefaults");
@@ -723,6 +754,33 @@
       }
     }
 
+    // ---------- Notifications ----------
+    async function ensureNotificationPermission(){
+      if(!settings.notificationsOn) return false;
+      if(!("Notification" in window)) return false;
+
+      if(Notification.permission === "granted") return true;
+      if(Notification.permission === "denied") return false;
+
+      // Must be triggered by user gesture (Start click / Space)
+      try{
+        const res = await Notification.requestPermission();
+        return res === "granted";
+      }catch{
+        return false;
+      }
+    }
+
+    function sendNotification(title, body){
+      if(!settings.notificationsOn) return;
+      if(!("Notification" in window)) return;
+      if(Notification.permission !== "granted") return;
+
+      try{
+        new Notification(title, { body });
+      }catch{}
+    }
+
     // ---------- Sound ----------
     // Default beep always works.
     function defaultBeep(){
@@ -740,7 +798,7 @@
         const now = ctx.currentTime;
         g.gain.exponentialRampToValueAtTime(0.15, now + 0.01);
         g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
-        o.stop(now + 0.2);
+        o.stop(now + 3);
         o.onended = () => ctx.close();
       }catch{}
     }
@@ -749,44 +807,85 @@
     audioEl.preload = "auto";
 
     async function tryLoadAudioListFromManifest(){
-      // NOTE: fetch('audios/manifest.json') may fail on file:// URLs.
+      // Accepts either:
+      // ["a.mp3","b.mp3"]
+      // or [{ "src":"a.mp3", "weight": 5 }, { "src":"b.mp3", "weight": 1 }]
       try{
         const res = await fetch("audios/manifest.json", { cache: "no-store" });
         if(!res.ok) return null;
-        const list = await res.json();
-        if(!Array.isArray(list)) return null;
-        // normalize into paths
-        const cleaned = list
-          .filter(x => typeof x === "string" && x.trim().length > 0)
-          .map(x => x.trim())
-          .map(x => x.startsWith("audios/") ? x : ("audios/" + x));
-        return cleaned.length ? cleaned : null;
+
+        const raw = await res.json();
+        if(!Array.isArray(raw)) return null;
+
+        const cleaned = raw.map((x) => {
+          if(typeof x === "string"){
+            const src = x.trim();
+            if(!src) return null;
+            return { src: src.startsWith("audios/") ? src : ("audios/" + src), weight: 1 };
+          }
+          if(x && typeof x === "object" && typeof x.src === "string"){
+            const src = x.src.trim();
+            if(!src) return null;
+            const w = Number.isFinite(Number(x.weight)) ? Math.max(0, Number(x.weight)) : 1;
+            return { src: src.startsWith("audios/") ? src : ("audios/" + src), weight: w };
+          }
+          return null;
+        }).filter(Boolean);
+
+        const finalList = cleaned.filter(x => x.weight > 0);
+        return finalList.length ? finalList : null;
       }catch{
         return null;
       }
     }
 
     function fallbackAudioCandidates(){
-      // if you don't want this, remove names and rely on manifest
-      const names = [
-        "audios/konata---good-job!-made-with-Voicemod.mp3","audios/nii,-omega-good-job-made-with-Voicemod.mp3","audios/3.mp3"
+      return [
+        { src: "audios/konata---good-job!-made-with-Voicemod.mp3", weight: 1 },
+        { src: "audios/nii,-omega-good-job-made-with-Voicemod.mp3", weight: 1 },
+        { src: "audios/3.mp3", weight: 1 }
       ];
-      return names;
+    }
+
+    function weightedPickIndex(items){
+      const total = items.reduce((acc, it) => acc + it.weight, 0);
+      if(total <= 0) return 0;
+      let r = Math.random() * total;
+      for(let i = 0; i < items.length; i++){
+        r -= items[i].weight;
+        if(r <= 0) return i;
+      }
+      return items.length - 1;
     }
 
     async function pickRandomPlayableAudio(){
+      // chance to use custom audio, otherwise skip to beep-only
+      const chance = (settings.audioPickChance ?? 1.0);
+      if(Math.random() > chance){
+        return null;
+      }
+
       const manifestList = await tryLoadAudioListFromManifest();
       const list = manifestList ?? fallbackAudioCandidates();
+      if(!list || !list.length) return null;
 
-      // Pick random (avoid repeating last pick if possible)
-      let idx = Math.floor(Math.random() * list.length);
+      let idx = weightedPickIndex(list);
+
+      // Avoid repeating last pick if possible
       if(list.length > 1 && idx === settings.lastAudioPick){
-        idx = (idx + 1) % list.length;
+        for(let k = 0; k < 3; k++){
+          const alt = weightedPickIndex(list);
+          if(alt !== settings.lastAudioPick){
+            idx = alt;
+            break;
+          }
+        }
       }
+
       settings.lastAudioPick = idx;
       saveAll();
 
-      const src = list[idx];
+      const src = list[idx].src;
 
       // Try to load quickly
       return new Promise((resolve) => {
@@ -811,11 +910,9 @@
           resolve(null);
         };
 
-        // kick load
         audioEl.src = src;
         audioEl.load();
 
-        // timeout fallback
         setTimeout(() => {
           if(settled) return;
           settled = true;
@@ -829,16 +926,23 @@
       if(!settings.soundOn) return;
 
       const src = await pickRandomPlayableAudio();
+
+      // If no custom audio, just beep
       if(!src){
         defaultBeep();
         return;
       }
 
       try{
+        // play custom audio, then ALWAYS beep after
         audioEl.currentTime = 0;
+        audioEl.onended = () => {
+          audioEl.onended = null;
+          defaultBeep();
+        };
         await audioEl.play();
       }catch{
-        // If autoplay blocked (first interaction usually allows), fallback beep
+        // autoplay blocked -> beep
         defaultBeep();
       }
     }
@@ -893,7 +997,15 @@
 
         stop();
 
-        // sound (random audio if possible, otherwise default beep)
+        // ✅ Notification
+        sendNotification(
+          completedMode === "work" ? "Work session done" : "Break done",
+          settings.autoSwitch
+            ? (completedMode === "work" ? "Time for a break." : "Back to work.")
+            : "Timer finished."
+        );
+
+        // ✅ sound: random audio (sometimes), then always beep
         playEndSound();
 
         if(completedMode === "work"){
@@ -924,8 +1036,10 @@
     function start(){
       rolloverIfNewDay();
 
+      // Ask permission on first actual start (user gesture)
+      ensureNotificationPermission();
+
       if(mode === "work" && sessionLimitReached()){
-        // small feedback
         if(settings.soundOn) defaultBeep();
         renderSessions();
         return;
@@ -975,6 +1089,10 @@
       inpSessionsTarget.disabled = !!settings.sessionsForever;
 
       inpDailyGoalHours.value = settings.dailyGoalHours;
+
+      // ✅ NEW
+      inpNotificationsOn.checked = !!settings.notificationsOn;
+      inpAudioPickChance.value = (settings.audioPickChance ?? 1.0);
     }
 
     function applySettingsFromUI(){
@@ -989,7 +1107,10 @@
       settings.autoSwitch = !!inpAuto.checked;
       settings.soundOn = !!inpSound.checked;
 
-      // reflect disabled state immediately
+      // ✅ NEW
+      settings.notificationsOn = !!inpNotificationsOn.checked;
+      settings.audioPickChance = clampFloat(inpAudioPickChance.value, 0, 1);
+
       inpSessionsTarget.disabled = settings.sessionsForever;
 
       saveAll();
@@ -998,8 +1119,6 @@
     }
 
     function applySettingsAndReloadTimer(){
-      // This is what you wanted:
-      // when pressing Enter in settings, it applies and "reloads" the clock immediately.
       const wasRunning = isRunning;
       stop();
       applySettingsFromUI();
@@ -1024,14 +1143,12 @@
     }
 
     function clampImageIntoCard(){
-      // keep it roughly inside card
       const cardRect = timerCard.getBoundingClientRect();
       const w = 120 * settings.imgScale;
       const h = (floatingImg.naturalHeight && floatingImg.naturalWidth)
         ? (120 * settings.imgScale * (floatingImg.naturalHeight / floatingImg.naturalWidth))
         : (120 * settings.imgScale);
 
-      // limits in card coordinate space (relative)
       const minX = -10;
       const minY = -10;
       const maxX = Math.max(minX, cardRect.width - w + 10);
@@ -1091,7 +1208,6 @@
         saveAll();
       });
 
-      // if window resizes
       window.addEventListener("resize", () => {
         clampImageIntoCard();
         setImgTransform();
@@ -1099,7 +1215,6 @@
     }
 
     async function tryLoadFirstExistingImage(){
-      // We can't list a folder, so try common names.
       const candidates = [
         "images/1.png", "images/2.png"
       ];
@@ -1109,7 +1224,7 @@
           const img = new Image();
           img.onload = () => resolve(true);
           img.onerror = () => resolve(false);
-          img.src = url + "?v=" + Date.now(); // bust cache during dev
+          img.src = url + "?v=" + Date.now();
         });
       }
 
@@ -1123,7 +1238,6 @@
     async function initImage(){
       const url = await tryLoadFirstExistingImage();
       if(!url){
-        // no image found; hide wrapper
         floatingImgWrap.style.display = "none";
         return;
       }
@@ -1165,6 +1279,10 @@
     inpSessionsForever.addEventListener("change", applySettingsFromUI);
     inpSessionsTarget.addEventListener("change", applySettingsFromUI);
     inpDailyGoalHours.addEventListener("change", applySettingsFromUI);
+
+    // ✅ NEW
+    inpNotificationsOn.addEventListener("change", applySettingsFromUI);
+    inpAudioPickChance.addEventListener("change", applySettingsFromUI);
 
     btnResetCounters.addEventListener("click", () => {
       rolloverIfNewDay();
